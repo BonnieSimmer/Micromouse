@@ -8,166 +8,155 @@
 #define MR1 9  //fwd
 #define MR2 10
 
-bool front;
-bool leftTop;
-bool leftBottom;
-bool rightTop;
-bool rightBottom;
+ bool obstacleCenter;
+ bool obstacleBackLeft;
+ bool obstacleBackRight;
+ bool obstacleTopLeft;
+ bool obstacleTopRight;
 
-bool speedInput = 0;
+int speedRight;
+int speedLeft;
 
-bool frontObstacle;
-bool leftTopObstacle;
-bool leftBottomObstacle;
-bool rightTopObstacle;
-bool rightBottomObstacle;
+float multiplierL;
+float multiplierR;
 
-
-const int timeCorner = 1050;  //time it takes to make a 90 degree angle around corners;
-
-int speedRight = 160;
-int speedLeft = 179;
-float MultiplerR;
-float MultiplerL;
 //Declare all the functions being used here:
-void moveForward();
-void turnRight();
-void turnLeft();
-void AdjustRight();
-void adjustLeft();
-void stopMotors();
+void deviateRight();
+void Right();
+void deviateLeft();
+void Left();
+void forward();
+void stopAll();
+void centering();
+
+bool speedInput;
 
 void setup() {
-  // put your setup code here, to run once:
+  pinMode(IR_C, INPUT);
+  pinMode(IR_TL, INPUT);
+  pinMode(IR_TR, INPUT);
+  pinMode(IR_BL, INPUT);
+  pinMode(IR_BR, INPUT);
+  
   pinMode(ML1, OUTPUT);
   pinMode(ML2, OUTPUT);
   pinMode(MR1, OUTPUT);
   pinMode(MR2, OUTPUT);
 
-  pinMode(IR_C, INPUT);
-  pinMode(IR_TR, INPUT);
-  pinMode(IR_BR, INPUT);
-  pinMode(IR_TL, INPUT);
-  pinMode(IR_BL, INPUT);
-
   Serial.begin(9600);
 
-  //Send Speed over bluetooth;
-  while (!speedInput) {
+    while (!speedInput) {
     if (Serial.available() > 0)  // if data is available to read
     {
       speedRight = Serial.parseInt();
       speedLeft = Serial.parseInt();
-      MultiplerR = Serial.parseFloat();
-      MultiplerL = Serial.parseFloat();
+      multiplierR= Serial.parseFloat();
+      multiplierL= Serial.parseFloat();
       speedInput = Serial.parseInt();
     }
   }
+  centering();
 }
+
 void loop() {
+  obstacleCenter = digitalRead(IR_C) == LOW;
+  obstacleTopLeft = digitalRead(IR_TL) == LOW;
+  obstacleTopRight = digitalRead(IR_TR) == LOW;
+  obstacleBackLeft = digitalRead(IR_BL) == LOW;
+  obstacleBackRight = digitalRead(IR_BR) == LOW;
 
-  //Read sensor values
-  front = digitalRead(IR_C);
-  leftTop = digitalRead(IR_TL);
-  leftBottom = digitalRead(IR_BL);
-  rightTop = digitalRead(IR_TR);
-  rightBottom = digitalRead(IR_BR);
-  
-  // Print sensor values for debugging
-  Serial.print("Front: ");
-  Serial.print(front);
-  Serial.print(" LeftTop: ");
-  Serial.print(leftTop);
-  Serial.print(" LeftBottom: ");
-  Serial.print(leftBottom);
-  Serial.print(" RightTop: ");
-  Serial.print(rightTop);
-  Serial.print(" RightBottom: ");
-  Serial.println(rightBottom);
-
-  // Check for obstacles
-  frontObstacle = (front == 0);
-  leftTopObstacle = (leftTop == 0);
-  leftBottomObstacle = (leftBottom == 0);
-  rightTopObstacle = (rightTop == 0);
-  rightBottomObstacle = (rightBottom == 0);
-
-  //Navigating
-   if (frontObstacle) {
-    if (!leftBottomObstacle) {
-      turnLeft();
-    } else if (!rightBottomObstacle) {
-      turnRight();
-    } else {
-      stopMotors();
-      while (!restart) {
-        restart= Serial.parseInt();
-      }
-      restart=0;
-    }
-  } else {
-    // Adjust to stay centered
-    if (leftTopObstacle) {
-      adjustRight();
-    } else if (rightTopObstacle) {
-      adjustLeft();
-    } else {
-      moveForward();
+// CENTERING
+  if (!obstacleCenter) {
+    if (obstacleTopLeft && obstacleTopRight) {
+      // Move forward
+      forward();
+    } else if (obstacleTopLeft && !obstacleTopRight) {
+      // Deviate right
+      Right();
+    } else if (!obstacleTopLeft && obstacleTopRight) {
+      // Deviate left
+      Left();
+    } else if (!obstacleTopLeft && !obstacleTopRight) {
+      // Move forward
+     forward();
     }
   }
-
- // delay(100);  // Short delay for sensor reading stabilization
+  // NAVIGATING
+   else {
+ if (obstacleTopLeft && !obstacleTopRight) {
+      // Deviate right
+      deviateRight();
+    } else if (!obstacleTopLeft && obstacleTopRight) {
+      // Deviate left
+      deviateLeft();
+    } else if (!obstacleTopLeft && !obstacleTopRight) {
+      //choose priority
+      deviateLeft();
+    }
+      else if (obstacleTopLeft && obstacleTopRight) {
+      
+      stopAll();
+    }
+  }
 }
 
-void turnLeft() {
-  Serial.println("Turning left");
-  digitalWrite(ML2, LOW);
-  digitalWrite(ML1, LOW);
-  digitalWrite(MR2, LOW);
-  analogWrite(MR1, speedRight);
-
-  delay(timeCorner);
-}
-
-void adjustLeft() {
- Serial.println("Adjusting left");
-  digitalWrite(ML2, LOW);
-  digitalWrite(ML1, LOW);
-  digitalWrite(MR2, LOW);
-  analogWrite(MR1, speedRight * MultiplerL);
-}
-
-void turnRight() {
-  Serial.println("Turning right");
-  digitalWrite(ML2, LOW);
-  analogWrite(ML1, speedLeft);
-  digitalWrite(MR2, LOW);
-  digitalWrite(MR1, LOW);
-
-  delay(timeCorner);
-}
-
-void adjustRight() {
-  Serial.println("Adjusting right");
-  digitalWrite(ML2, LOW);
-  analogWrite(ML1, speedLeft * MultiplerR);
-  digitalWrite(MR2, LOW);
-  digitalWrite(MR1, LOW);
-}
-
-void moveForward() {
+void forward() {
   Serial.println("Forward");
+  centering();
   analogWrite(ML1, speedLeft);
-  digitalWrite(ML2, LOW);
-  digitalWrite(MR2, LOW);
+  //digitalWrite(ML2, LOW);
+  //digitalWrite(MR2, LOW);
   analogWrite(MR1, speedRight);
 }
 
-void stopMotors() {
+
+void Left() {
+  Serial.println("Centering Left");
+  //digitalWrite(ML2, LOW);
+  digitalWrite(ML1, LOW);
+  //digitalWrite(MR2, LOW);
+  analogWrite(MR1, speedRight*multiplierL);
+}
+void Right() {
+  Serial.println("Centering Right");
+  analogWrite(ML1, speedLeft*multiplierR);
+  //digitalWrite(ML2, LOW);
+  //digitalWrite(MR2, LOW);
+  digitalWrite(MR1, LOW);
+}
+void centering() {
+  bool exitCentering = false;  // Flag to indicate when to exit the centering loop
+
+  while (!exitCentering) {
+    if ((digitalRead(IR_TR) == 1)&&(digitalRead(IR_C) == HIGH)) {
+      Right();
+    } else if ((digitalRead(IR_TL) == 1)&&(digitalRead(IR_C) == HIGH)) {
+      Left();
+    } else {
+      exitCentering = true;  // Exit the loop when no obstacle detected on either side
+    }
+    delay(10);  // Add a small delay to allow the car to adjust its direction
+  }
+}
+void stopAll() {
   Serial.println("Done");
   digitalWrite(ML1, LOW);
-  digitalWrite(ML2, LOW);
-  digitalWrite(MR2, LOW);
+  //digitalWrite(ML2, LOW);
+  //digitalWrite(MR2, LOW);
+  digitalWrite(MR1, LOW);
+ // delay(1000);
+}
+void deviateLeft() {
+  Serial.println("Left");
+  //digitalWrite(ML2, LOW);
+  digitalWrite(ML1, LOW);
+  //digitalWrite(MR2, LOW);
+  analogWrite(MR1, speedRight);
+}
+void deviateRight() {
+  Serial.println("Right");
+  analogWrite(ML1, speedLeft);
+  //digitalWrite(ML2, LOW);
+  //digitalWrite(MR2, LOW);
   digitalWrite(MR1, LOW);
 }
-
